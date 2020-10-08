@@ -140,7 +140,7 @@ func getNameEmoji(id int, name string) string {
 		8930:   "🌏 ", // Sid Meier's Civilization V
 		359550: "🌈 ", // Tom Clancy's Rainbow Six Siege
 		438100: "💖 ", // VRChat 
-		719950: "👓 ", // Windows Mixed Reality for SteamVR
+		250820: "👓 ", // SteamVR
 
 	}
 
