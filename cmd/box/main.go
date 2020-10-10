@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/YouEclipse/steam-box/pkg/steambox"
+	"github.com/3uxi/steam-box/pkg/steambox"
 	"github.com/google/go-github/github"
 )
 
@@ -28,7 +28,8 @@ func main() {
 
 	ghToken := os.Getenv("GH_TOKEN")
 	ghUsername := os.Getenv("GH_USER")
-	gistID := os.Getenv("GIST_ID")
+	allTimeGistID := os.Getenv("ALL_TIME_GIST_ID")
+	recentTimeGistID := os.Getenv("RECENT_TIME_GIST_ID")
 
 	updateOption := os.Getenv("UPDATE_OPTION") // options for update: GIST,MARKDOWN,GIST_AND_MARKDOWN
 	markdownFile := os.Getenv("MARKDOWN_FILE") // the markdown filename
@@ -47,43 +48,58 @@ func main() {
 
 	ctx := context.Background()
 
-	lines, err := box.GetPlayTime(ctx, steamID, appIDList...)
+	allTimeLines, err := box.GetPlayTime(ctx, steamID, appIDList...)
 	if err != nil {
 		panic("GetPlayTime err:" + err.Error())
 	}
 
-	filename := "🎮 Steam playtime leaderboard"
-
-	if updateGist {
-		gist, err := box.GetGist(ctx, gistID)
-		if err != nil {
-			panic("GetGist err:" + err.Error())
-		}
-
-		f := gist.Files[github.GistFilename(filename)]
-
-		f.Content = github.String(strings.Join(lines, "\n"))
-		gist.Files[github.GistFilename(filename)] = f
-
-		err = box.UpdateGist(ctx, gistID, gist)
-		if err != nil {
-			panic("UpdateGist err:" + err.Error())
-		}
+	recentTimeLines, err := box.GetRecentPlayGanesWithTime(ctx, steamID, 5)
+	if err != nil {
+		panic("GetRecentTime err:" + err.Error())
 	}
 
-	if updateMarkdown && markdownFile != "" {
-		title := filename
+	type info struct {
+		gistID   string
+		lines    []string
+		filename string
+	}
+
+	tasks := []info{info{allTimeGistID, allTimeLines, "🎮 Steam playtime leaderboard"},
+		info{recentTimeGistID, recentTimeLines, "🎮 Steam recent games leaderboard"}}
+
+	for _, v := range tasks {
+
 		if updateGist {
-			title = fmt.Sprintf(`#### <a href="https://gist.github.com/%s" target="_blank">%s</a>`, gistID, title)
+			gist, err := box.GetGist(ctx, v.gistID)
+			if err != nil {
+				panic("GetGist err:" + err.Error())
+			}
+
+			f := gist.Files[github.GistFilename(v.filename)]
+
+			f.Content = github.String(strings.Join(v.lines, "\n"))
+			gist.Files[github.GistFilename(v.filename)] = f
+
+			err = box.UpdateGist(ctx, v.gistID, gist)
+			if err != nil {
+				panic("UpdateGist err:" + err.Error())
+			}
 		}
 
-		content := bytes.NewBuffer(nil)
-		content.WriteString(strings.Join(lines, "\n"))
+		if updateMarkdown && markdownFile != "" {
+			title := v.filename
+			if updateGist {
+				title = fmt.Sprintf(`#### <a href="https://gist.github.com/%s" target="_blank">%s</a>`, v.gistID, title)
+			}
 
-		err = box.UpdateMarkdown(ctx, title, markdownFile, content.Bytes())
-		if err != nil {
-			fmt.Println(err)
+			content := bytes.NewBuffer(nil)
+			content.WriteString(strings.Join(v.lines, "\n"))
+
+			err = box.UpdateMarkdown(ctx, title, markdownFile, content.Bytes())
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Println("updating markdown successfully on", markdownFile)
 		}
-		fmt.Println("updating markdown successfully on", markdownFile)
 	}
 }

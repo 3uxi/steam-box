@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	steam "github.com/YouEclipse/steam-go/pkg"
+	steam "github.com/3uxi/steam-go/pkg"
 	"github.com/google/go-github/github"
 	"github.com/mattn/go-runewidth"
 )
@@ -52,7 +52,7 @@ func (b *Box) UpdateGist(ctx context.Context, id string, gist *github.Gist) erro
 	return err
 }
 
-// GetPlayTime gets the paytime form steam web API.
+// GetPlayTime gets the paytime from steam web API.
 func (b *Box) GetPlayTime(ctx context.Context, steamID uint64, appID ...uint32) ([]string, error) {
 	params := &steam.GetOwnedGamesParams{
 		SteamID:                steamID,
@@ -85,6 +85,37 @@ func (b *Box) GetPlayTime(ctx context.Context, steamID uint64, appID ...uint32) 
 			pad(fmt.Sprintf("🕘 %d hrs %d mins", hours, mins), "", 16)
 		lines = append(lines, line)
 		max++
+	}
+	return lines, nil
+}
+
+// GetRecentPlayGamesWithTime gets the recent played games from steam web API.
+func (b *Box) GetRecentPlayGanesWithTime(ctx context.Context, steamID uint64, maxCount uint32) ([]string, error) {
+	params := &steam.GetRecentlyPlayedGamesParams{
+		SteamID: steamID,
+		Count:   5,
+	}
+
+	if maxCount != 0 {
+		params.Count = maxCount
+	}
+
+	gameRet, err := b.steam.IPlayerService.GetRecentlyPlayedGames(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	var lines []string
+	sort.Slice(gameRet.Games, func(i, j int) bool {
+		return gameRet.Games[i].PlayTime2Weeks > gameRet.Games[j].PlayTime2Weeks
+	})
+
+	for _, game := range gameRet.Games {
+		hours := int(math.Floor(float64(game.PlayTime2Weeks / 60)))
+		mins := int(math.Floor(float64(game.PlayTime2Weeks % 60)))
+
+		line := pad(getNameEmoji(game.Appid, game.Name), " ", 35) + " " +
+			pad(fmt.Sprintf("🕘 %d hrs %d mins", hours, mins), "", 16)
+		lines = append(lines, line)
 	}
 	return lines, nil
 }
